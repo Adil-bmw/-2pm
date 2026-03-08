@@ -36,9 +36,8 @@ with col2:
 
 st.markdown("---")
 
-# Зона 2: Ввод переменных данных
+# Зона 2: Ввод данных
 st.header("Зона 2: Ввод данных")
-
 student_app_input = st.text_area("Текст заявки студента",
                                  value="Хочу создать веб-приложение для генерации музыки с помощью нейросетей. Знаю Python, хочу изучить PyTorch и машинное обучение.")
 
@@ -47,7 +46,7 @@ professors_json_input = st.text_area("JSON-профили преподавате
 
 st.markdown("---")
 
-# Зона 3: Запуск и визуализация
+# Зона 3: Запуск
 st.header("Зона 3: Запуск экипажа")
 
 if st.button("Сохранить и запустить"):
@@ -55,60 +54,39 @@ if st.button("Сохранить и запустить"):
         st.error("Пожалуйста, введи Gemini API Key в боковой панели!")
     else:
         try:
-            # Установка ключа в переменные окружения
+            
             os.environ["GOOGLE_API_KEY"] = api_key
+            os.environ["GEMINI_API_KEY"] = api_key
 
-
+            
             llm = ChatGoogleGenerativeAI(
                 model="gemini-2.5-flash",
                 verbose=True,
                 temperature=0.5,
-                google_api_key=api_key
+                google_api_key=api_key # Передача ключа напрямую
             )
 
-            # Инициализация агентов
+            # Создание агентов
             researcher = Agent(
-                role=agent1_role,
-                goal=agent1_goal,
-                backstory=agent1_backstory,
-                llm=llm,
-                verbose=True
+                role=agent1_role, goal=agent1_goal, backstory=agent1_backstory,
+                llm=llm, verbose=True, allow_delegation=False
             )
-
             matcher = Agent(
-                role=agent2_role,
-                goal=agent2_goal,
-                backstory=agent2_backstory,
-                llm=llm,
-                verbose=True
+                role=agent2_role, goal=agent2_goal, backstory=agent2_backstory,
+                llm=llm, verbose=True, allow_delegation=False
             )
 
-            # Инициализация задач
-            task1 = Task(
-                description=task1_desc,
-                expected_output="Структурированное резюме студента (интересы, стек).",
-                agent=researcher
-            )
+            # Задачи
+            task1 = Task(description=task1_desc, agent=researcher, expected_output="Резюме интересов.")
+            task2 = Task(description=task2_desc, agent=matcher, expected_output="Имя и обоснование.")
 
-            task2 = Task(
-                description=task2_desc,
-                expected_output="Имя выбранного преподавателя и детальное обоснование выбора.",
-                agent=matcher
-            )
+            crew = Crew(agents=[researcher, matcher], tasks=[task1, task2], process=Process.sequential)
 
-
-            crew = Crew(
-                agents=[researcher, matcher],
-                tasks=[task1, task2],
-                process=Process.sequential
-            )
-
-            with st.spinner("Агенты анализируют данные..."):
+            with st.spinner("Агенты работают..."):
                 result = crew.kickoff(inputs={
                     'student_application': student_app_input,
                     'professors_json': professors_json_input
                 })
-
                 st.success("Готово!")
                 st.markdown("### Результат мэтчинга:")
                 st.write(result.raw)
